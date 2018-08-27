@@ -7,14 +7,16 @@ GOOS?=linux
 REGISTRY?=staging-k8s.gcr.io
 BASEIMAGE?=k8s.gcr.io/debian-base-amd64:0.3.2
 
-deps:
-	go get github.com/tools/godep
+CLUSTERAPI_VENDOR_DIR = $(GOPATH)/src/k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi/internal/vendor
 
-build: clean deps
+deps:
+	go get -v github.com/tools/godep
+
+build: clean deps | $(CLUSTERAPI_VENDOR_DIR)
 	$(ENVVAR) GOOS=$(GOOS) godep go build ./...
 	$(ENVVAR) GOOS=$(GOOS) godep go build -o cluster-autoscaler
 
-build-binary: clean deps
+build-binary: clean deps | $(CLUSTERAPI_VENDOR_DIR)
 	$(ENVVAR) GOOS=$(GOOS) godep go build -o cluster-autoscaler
 
 test-unit: clean deps build
@@ -59,3 +61,13 @@ test-in-docker: clean docker-builder
 
 .PHONY: all deps build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate
 
+rclean: clean
+	$(RM) -r $(CLUSTERAPI_VENDOR_DIR)
+
+$(CLUSTERAPI_VENDOR_DIR):
+	$(MAKE) vendor-clusterapi
+
+.PHONY: vendor-clusterapi
+
+vendor-clusterapi:
+	go generate k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi/internal/...
