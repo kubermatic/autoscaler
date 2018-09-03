@@ -98,9 +98,17 @@ func (m *clusterMachineSet) Nodes() ([]string, error) {
 
 	result := make([]string, len(machines.Items))
 
-	for i := range machines.Items {
-		glog.Infof("MachineSet: %q, nodes[%d]=%q", m.MachineSet.Name, i, machines.Items[i].Name)
-		result[i] = machines.Items[i].Name
+	for i, machine := range machines.Items {
+		glog.Infof("MachineSet: %q, nodes[%d]=%q", m.MachineSet.Name, i, machine.Name)
+		if machine.Status.NodeRef == nil {
+			glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
+			continue
+		}
+		if machine.Status.NodeRef.Kind != "Node" {
+			glog.Errorf("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
+			continue
+		}
+		result[i] = machine.Status.NodeRef.Name
 	}
 
 	return result, nil
