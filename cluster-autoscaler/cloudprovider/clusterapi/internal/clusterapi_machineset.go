@@ -96,7 +96,7 @@ func (m *clusterMachineSet) Nodes() ([]string, error) {
 		return nil, fmt.Errorf("unable to list machines of machineset %q: %v", m.Name(), err)
 	}
 
-	result := make([]string, len(machines.Items))
+	result := []string{}
 
 	for i, machine := range machines.Items {
 		glog.Infof("MachineSet: %q, nodes[%d]=%q", m.MachineSet.Name, i, machine.Name)
@@ -108,7 +108,7 @@ func (m *clusterMachineSet) Nodes() ([]string, error) {
 			glog.Errorf("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
 			continue
 		}
-		result[i] = machine.Status.NodeRef.Name
+		result = append(result, machine.Status.NodeRef.Name)
 	}
 
 	return result, nil
