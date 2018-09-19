@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/glog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 
 	v1alpha1apis "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
@@ -14,6 +13,7 @@ import (
 type clusterMachineSet struct {
 	*clusterManager
 	*v1alpha1apis.MachineSet
+	nodes []string
 }
 
 func getLabelAsInt(clusterMachineSet *v1alpha1apis.MachineSet, label string) (int, error) {
@@ -28,11 +28,11 @@ func getLabelAsInt(clusterMachineSet *v1alpha1apis.MachineSet, label string) (in
 }
 
 func machineSetMinSize(clusterMachineSet *v1alpha1apis.MachineSet) (int, error) {
-	return getLabelAsInt(clusterMachineSet, "sigs.k8s.io/clusterManager-autoscaler-node-group-min-size")
+	return getLabelAsInt(clusterMachineSet, "sigs.k8s.io/cluster-api-autoscaler-node-group-min-size")
 }
 
 func machineSetMaxSize(clusterMachineSet *v1alpha1apis.MachineSet) (int, error) {
-	return getLabelAsInt(clusterMachineSet, "sigs.k8s.io/clusterManager-autoscaler-node-group-max-size")
+	return getLabelAsInt(clusterMachineSet, "sigs.k8s.io/cluster-api-autoscaler-node-group-max-size")
 }
 
 func (m *clusterMachineSet) Name() string {
@@ -46,7 +46,7 @@ func (m *clusterMachineSet) Namespace() string {
 func (m *clusterMachineSet) MinSize() int {
 	sz, err := machineSetMinSize(m.MachineSet)
 	if err != nil {
-		glog.Errorf("failed to get minimum size from %s/%s: %v", m.MachineSet.Name, m.MachineSet.Namespace, err)
+		glog.Errorf("failed to get minimum size from %s/%s: %v", m.MachineSet.Namespace, m.MachineSet.Name, err)
 		return 0
 	}
 	return sz
@@ -55,7 +55,7 @@ func (m *clusterMachineSet) MinSize() int {
 func (m *clusterMachineSet) MaxSize() int {
 	sz, err := machineSetMaxSize(m.MachineSet)
 	if err != nil {
-		glog.Errorf("failed to get maximum size from %s/%s: %v", m.MachineSet.Name, m.MachineSet.Namespace, err)
+		glog.Errorf("failed to get maximum size from %s/%s: %v", m.MachineSet.Namespace, m.MachineSet.Name, err)
 		return 0
 	}
 	return sz
@@ -88,28 +88,19 @@ func (m *clusterMachineSet) IncreaseSize(delta int) error {
 }
 
 func (m *clusterMachineSet) Nodes() ([]string, error) {
-	machines, err := m.clientapi.Machines(m.MachineSet.Namespace).List(v1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(m.MachineSet.Spec.Selector.MatchLabels).String(),
-	})
+	return m.nodes, nil
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("unable to list machines of machineset %q: %v", m.Name(), err)
+func (m *clusterMachineSet) String() string {
+	return fmt.Sprintf("%s/%s", m.Namespace(), m.Name())
+}
+
+func (m *clusterMachineSet) hasBounds() bool {
+	if _, err := machineSetMinSize(m.MachineSet); err != nil {
+		return false
 	}
-
-	result := []string{}
-
-	for i, machine := range machines.Items {
-		glog.Infof("MachineSet: %q, nodes[%d]=%q", m.MachineSet.Name, i, machine.Name)
-		if machine.Status.NodeRef == nil {
-			glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
-			continue
-		}
-		if machine.Status.NodeRef.Kind != "Node" {
-			glog.Errorf("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
-			continue
-		}
-		result = append(result, machine.Status.NodeRef.Name)
+	if _, err := machineSetMaxSize(m.MachineSet); err != nil {
+		return false
 	}
-
-	return result, nil
+	return true
 }

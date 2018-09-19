@@ -3,29 +3,52 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi/types"
 	"k8s.io/client-go/tools/clientcmd"
+	v1alpha1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 	"sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
-	v1alpha1 "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
+	v1alpha1apis "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
 )
 
 const (
 	refreshInterval  = 1 * time.Minute
-	defaultNamespace = "default" // TODO(frobware)
+	defaultNamespace = "openshift-cluster-api" // TODO(frobware)
 )
 
+type MachineSetID string
+
+type clusterSnapshot struct {
+	MachineSetMap          map[MachineSetID]*clusterMachineSet
+	MachineToMachineSetMap map[string]MachineSetID
+	MachineSetNodeMap      map[MachineSetID][]string
+}
+
 type clusterManager struct {
-	lastRefresh    time.Time
-	clientapi      v1alpha1.ClusterV1alpha1Interface
-	resourceLimits *cloudprovider.ResourceLimiter
+	lastRefresh          time.Time
+	clientapi            v1alpha1apis.ClusterV1alpha1Interface
+	resourceLimits       *cloudprovider.ResourceLimiter
+	clusterSnapshotMutex sync.Mutex
+	clusterSnapshot      *clusterSnapshot
+}
+
+func init() {
+	spew.Config = spew.ConfigState{
+		DisablePointerAddresses: true,
+		DisableCapacities:       true,
+		SortKeys:                true,
+		SpewKeys:                true,
+		Indent:                  "  ",
+	}
 }
 
 func (m *clusterManager) Cleanup() error {
@@ -37,50 +60,57 @@ func (m *clusterManager) GetResourceLimiter() (*cloudprovider.ResourceLimiter, e
 }
 
 func (m *clusterManager) GetMachineSets(namespace string) ([]types.MachineSet, error) {
-	if namespace == "" {
-		namespace = defaultNamespace
-	}
+	result := []types.MachineSet{}
 
-	clusterMachineSets, err := m.clientapi.MachineSets(namespace).List(v1.ListOptions{})
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("cannot list machinesets: %v", err))
-	}
-
-	result := make([]types.MachineSet, len(clusterMachineSets.Items))
-
-	for i := range clusterMachineSets.Items {
-		glog.Infof("[MachineSet:%v] %s/%s", i,
-			clusterMachineSets.Items[i].Namespace,
-			clusterMachineSets.Items[i].Name)
-		result[i] = &clusterMachineSet{
-			clusterManager: m,
-			MachineSet:     &clusterMachineSets.Items[i],
+	for _, ms := range m.getClusterState().MachineSetMap {
+		if ms.hasBounds() {
+			result = append(result, ms)
 		}
 	}
 
 	return result, nil
 }
 
-func (m *clusterManager) MachineSetForNode(node string) (types.MachineSet, error) {
-	machineSets, err := m.GetMachineSets("")
-	if err != nil {
-		return nil, err
+func (m *clusterManager) MachineSetForNode(nodename string) (types.MachineSet, error) {
+	snapshot := m.getClusterState()
+
+	key, exists := snapshot.MachineToMachineSetMap[nodename]
+	if !exists {
+		return nil, fmt.Errorf("unknown node: %q", nodename)
 	}
 
-	for i := range machineSets {
-		if node == machineSets[i].Name() {
-			return machineSets[i], nil
-		}
-	}
+	glog.Infof("MachineSetForNode: %q is node %q", nodename, key)
 
-	return nil, fmt.Errorf("node %q not found", node)
+	return snapshot.MachineSetMap[key], nil
+}
+
+func (m *clusterManager) getClusterState() *clusterSnapshot {
+	m.clusterSnapshotMutex.Lock()
+	defer m.clusterSnapshotMutex.Unlock()
+	return m.clusterSnapshot
+}
+
+func (m *clusterManager) setClusterState(s *clusterSnapshot) {
+	m.clusterSnapshotMutex.Lock()
+	defer m.clusterSnapshotMutex.Unlock()
+	m.clusterSnapshot = s
 }
 
 func (m *clusterManager) Refresh() error {
-	if m.lastRefresh.Add(refreshInterval).After(time.Now()) {
+	if m.lastRefresh.Add(refreshInterval).After(time.Now()) && m.clusterSnapshot != nil {
 		return nil
 	}
-	return nil
+	return m.forceRefresh()
+}
+
+func (m *clusterManager) forceRefresh() error {
+	s, err := m.clusterRefresh(defaultNamespace)
+	if err == nil {
+		m.lastRefresh = time.Now()
+		glog.Infof("cluster refreshed at %v\n%v", m.lastRefresh, spew.Sdump(s))
+		m.setClusterState(s)
+	}
+	return err
 }
 
 func NewClusterManager(do cloudprovider.NodeGroupDiscoveryOptions) (*clusterManager, error) {
@@ -99,6 +129,59 @@ func NewClusterManager(do cloudprovider.NodeGroupDiscoveryOptions) (*clusterMana
 	}
 
 	return &clusterManager{
-		clientapi: clientapi.ClusterV1alpha1(),
+		clientapi:       clientapi.ClusterV1alpha1(),
+		clusterSnapshot: newClusterSnapshot(),
 	}, nil
+}
+
+func (m *clusterManager) clusterRefresh(namespace string) (*clusterSnapshot, error) {
+	snapshot := newClusterSnapshot()
+	machineSets, err := m.clientapi.MachineSets(namespace).List(v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to list machinesets in the %q namespace: %v", namespace, err)
+	}
+
+	for i := range machineSets.Items {
+		ms := &clusterMachineSet{
+			clusterManager: m,
+			MachineSet:     &machineSets.Items[i],
+		}
+
+		msid := machineSetID(ms.MachineSet)
+		machines, err := m.clientapi.Machines(namespace).List(v1.ListOptions{
+			LabelSelector: labels.SelectorFromSet(ms.MachineSet.Spec.Selector.MatchLabels).String(),
+		})
+
+		if err != nil {
+			glog.Errorf("unable to get machines for %q: %v", msid)
+			continue
+		}
+
+		snapshot.MachineSetMap[msid] = ms
+		snapshot.MachineSetNodeMap[msid] = []string{}
+
+		for i := range machines.Items {
+			name := machines.Items[i].Name
+			snapshot.MachineToMachineSetMap[name] = msid
+			snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], name) // XXX should be node name, not machine name
+		}
+
+		ms.nodes = snapshot.MachineSetNodeMap[msid]
+
+		glog.Infof("MachineSet: %q has nodes %v", msid, snapshot.MachineSetNodeMap[msid])
+	}
+
+	return snapshot, nil
+}
+
+func machineSetID(m *v1alpha1.MachineSet) MachineSetID {
+	return MachineSetID(fmt.Sprintf("%s/%s", m.Namespace, m.Name))
+}
+
+func newClusterSnapshot() *clusterSnapshot {
+	return &clusterSnapshot{
+		MachineSetMap:          make(map[MachineSetID]*clusterMachineSet),
+		MachineSetNodeMap:      make(map[MachineSetID][]string),
+		MachineToMachineSetMap: make(map[string]MachineSetID),
+	}
 }

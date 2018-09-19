@@ -9,6 +9,7 @@ type ClusterManager interface {
 
 type MachineSet interface {
 	Name() string
+	Namespace() string
 	MinSize() int
 	MaxSize() int
 	Replicas() int

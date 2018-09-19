@@ -44,7 +44,7 @@ func (p *provider) Name() string {
 func (p *provider) NodeGroups() []cloudprovider.NodeGroup {
 	glog.Info("provider.NodeGroups()")
 
-	machineSets, err := p.clusterManager.GetMachineSets("default")
+	machineSets, err := p.clusterManager.GetMachineSets("")
 	if err != nil {
 		glog.Fatalf("error fetching machinesets: %v", err)
 		return nil
@@ -60,7 +60,7 @@ func (p *provider) NodeGroups() []cloudprovider.NodeGroup {
 }
 
 func (p *provider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
-	glog.Info("provider.NodeGroupForNode()")
+	glog.Infof("provider.NodeGroupForNode(): %q", node.Name)
 	ms, err := p.clusterManager.MachineSetForNode(node.Name)
 	if err != nil {
 		return nil, err
