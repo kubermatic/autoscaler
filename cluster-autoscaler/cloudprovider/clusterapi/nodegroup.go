@@ -53,7 +53,7 @@ func (ng *NodeGroup) IncreaseSize(delta int) error {
 	if size+delta > ng.MaxSize() {
 		return fmt.Errorf("size increase too large - desired:%d max:%d", size+delta, ng.MaxSize())
 	}
-	return ng.machineSet.IncreaseSize(delta)
+	return ng.machineSet.IncreaseSize(size+delta)
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on

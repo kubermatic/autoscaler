@@ -60,11 +60,11 @@ func (p *provider) NodeGroups() []cloudprovider.NodeGroup {
 }
 
 func (p *provider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, error) {
-	glog.Infof("provider.NodeGroupForNode(): %q", node.Name)
 	ms, err := p.clusterManager.MachineSetForNode(node.Name)
 	if err != nil {
 		return nil, err
 	}
+	glog.Infof("provider.NodeGroupForNode(%q)=%s/%s", node.Name, ms.Namespace(), ms.Name())
 	return NewNodeGroup(p.clusterManager, ms), nil
 }
 
