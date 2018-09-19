@@ -68,6 +68,8 @@ func (m *clusterManager) GetMachineSets(namespace string) ([]types.MachineSet, e
 		}
 	}
 
+	glog.Infof("NODE GROUPS %v", spew.Sdump(result))
+
 	return result, nil
 }
 
@@ -160,10 +162,18 @@ func (m *clusterManager) clusterRefresh(namespace string) (*clusterSnapshot, err
 		snapshot.MachineSetMap[msid] = ms
 		snapshot.MachineSetNodeMap[msid] = []string{}
 
-		for i := range machines.Items {
-			name := machines.Items[i].Name
-			snapshot.MachineToMachineSetMap[name] = msid
-			snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], name) // XXX should be node name, not machine name
+		for _, machine := range machines.Items {
+			if machine.Status.NodeRef == nil {
+				glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
+				continue
+			}
+			if machine.Status.NodeRef.Kind != "Node" {
+				glog.Error("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
+				continue
+			}
+
+			snapshot.MachineToMachineSetMap[machine.Name] = msid
+			snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], machine.Status.NodeRef.Name)
 		}
 
 		ms.nodes = snapshot.MachineSetNodeMap[msid]

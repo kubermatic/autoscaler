@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -88,6 +89,7 @@ func (m *clusterMachineSet) IncreaseSize(delta int) error {
 }
 
 func (m *clusterMachineSet) Nodes() ([]string, error) {
+	glog.Infof("%s/%s has nodes %v", m.Namespace(), m.Name(), spew.Sdump(m.nodes))
 	return m.nodes, nil
 }
 
