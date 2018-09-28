@@ -75,15 +75,11 @@ func (m *clusterManager) GetMachineSets(namespace string) ([]types.MachineSet, e
 
 func (m *clusterManager) MachineSetForNode(nodename string) (types.MachineSet, error) {
 	snapshot := m.getClusterState()
-
-	key, exists := snapshot.MachineToMachineSetMap[nodename]
-	if !exists {
-		return nil, fmt.Errorf("unknown node: %q", nodename)
+	if key, exists := snapshot.MachineToMachineSetMap[nodename]; exists {
+		glog.Infof("MachineSetForNode: %q is node %q", nodename, key)
+		return snapshot.MachineSetMap[key], nil
 	}
-
-	glog.Infof("MachineSetForNode: %q is node %q", nodename, key)
-
-	return snapshot.MachineSetMap[key], nil
+	return nil, nil
 }
 
 func (m *clusterManager) getClusterState() *clusterSnapshot {
