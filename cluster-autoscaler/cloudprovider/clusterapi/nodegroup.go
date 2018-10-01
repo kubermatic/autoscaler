@@ -53,14 +53,14 @@ func (ng *NodeGroup) IncreaseSize(delta int) error {
 	if size+delta > ng.MaxSize() {
 		return fmt.Errorf("size increase too large - desired:%d max:%d", size+delta, ng.MaxSize())
 	}
-	return ng.machineSet.IncreaseSize(size+delta)
+	return ng.machineSet.IncreaseSize(size + delta)
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
 // failure or if the given node doesn't belong to this node group. This function
 // should wait until node group size is updated. Implementation required.
 func (ng *NodeGroup) DeleteNodes([]*apiv1.Node) error {
-	return cloudprovider.ErrNotImplemented
+	return ng.DecreaseTargetSize(-1)
 }
 
 // DecreaseTargetSize decreases the target size of the node group. This function
@@ -88,7 +88,7 @@ func (ng *NodeGroup) DecreaseTargetSize(delta int) error {
 			size, delta, len(nodes))
 	}
 
-	return ng.machineSet.IncreaseSize(delta)
+	return ng.machineSet.IncreaseSize(size + delta)
 }
 
 // Id returns an unique identifier of the node group.
