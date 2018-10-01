@@ -21,16 +21,16 @@ import (
 )
 
 const (
-	refreshInterval  = 1 * time.Minute
-	defaultNamespace = "openshift-cluster-api" // TODO(frobware)
+	refreshInterval  = 30 * time.Second
+	defaultNamespace = "test" // TODO(frobware)
 )
 
 type MachineSetID string
 
 type clusterSnapshot struct {
-	MachineSetMap          map[MachineSetID]*clusterMachineSet
-	MachineToMachineSetMap map[string]MachineSetID
-	MachineSetNodeMap      map[MachineSetID][]string
+	MachineSetMap       map[MachineSetID]*clusterMachineSet
+	NodeToMachineSetMap map[string]MachineSetID
+	MachineSetNodeMap   map[MachineSetID][]string
 }
 
 type clusterManager struct {
@@ -75,8 +75,8 @@ func (m *clusterManager) GetMachineSets(namespace string) ([]types.MachineSet, e
 
 func (m *clusterManager) MachineSetForNode(nodename string) (types.MachineSet, error) {
 	snapshot := m.getClusterState()
-	if key, exists := snapshot.MachineToMachineSetMap[nodename]; exists {
-		glog.Infof("MachineSetForNode: %q is node %q", nodename, key)
+	if key, exists := snapshot.NodeToMachineSetMap[nodename]; exists {
+		glog.Infof("MachineSetForNode[%q]=%q", nodename, key)
 		return snapshot.MachineSetMap[key], nil
 	}
 	return nil, nil
@@ -168,7 +168,7 @@ func (m *clusterManager) clusterRefresh(namespace string) (*clusterSnapshot, err
 				continue
 			}
 
-			snapshot.MachineToMachineSetMap[machine.Name] = msid
+			snapshot.NodeToMachineSetMap[machine.Status.NodeRef.Name] = msid
 			snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], machine.Status.NodeRef.Name)
 		}
 
@@ -186,8 +186,8 @@ func machineSetID(m *v1alpha1.MachineSet) MachineSetID {
 
 func newClusterSnapshot() *clusterSnapshot {
 	return &clusterSnapshot{
-		MachineSetMap:          make(map[MachineSetID]*clusterMachineSet),
-		MachineSetNodeMap:      make(map[MachineSetID][]string),
-		MachineToMachineSetMap: make(map[string]MachineSetID),
+		MachineSetMap:       make(map[MachineSetID]*clusterMachineSet),
+		MachineSetNodeMap:   make(map[MachineSetID][]string),
+		NodeToMachineSetMap: make(map[string]MachineSetID),
 	}
 }
