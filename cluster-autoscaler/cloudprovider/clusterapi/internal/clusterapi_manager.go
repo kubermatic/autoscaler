@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi/types"
+	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	v1alpha1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 	"sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
@@ -21,8 +22,7 @@ import (
 )
 
 const (
-	refreshInterval  = 30 * time.Second
-	defaultNamespace = "test" // TODO(frobware)
+	refreshInterval = 30 * time.Second
 )
 
 type MachineSetID string
@@ -35,10 +35,11 @@ type clusterSnapshot struct {
 
 type clusterManager struct {
 	lastRefresh          time.Time
-	clientapi            v1alpha1apis.ClusterV1alpha1Interface
-	resourceLimits       *cloudprovider.ResourceLimiter
-	clusterSnapshotMutex sync.Mutex
 	clusterSnapshot      *clusterSnapshot
+	clusterSnapshotMutex sync.Mutex
+	clusterapi           v1alpha1apis.ClusterV1alpha1Interface
+	kubeclient           *kubeclient.Clientset
+	resourceLimits       *cloudprovider.ResourceLimiter
 }
 
 func init() {
@@ -102,7 +103,7 @@ func (m *clusterManager) Refresh() error {
 }
 
 func (m *clusterManager) forceRefresh() error {
-	s, err := m.clusterRefresh(defaultNamespace)
+	s, err := m.clusterRefresh()
 	if err == nil {
 		m.lastRefresh = time.Now()
 		glog.Infof("cluster refreshed at %v\n%v", m.lastRefresh, spew.Sdump(s))
@@ -121,60 +122,74 @@ func NewClusterManager(do cloudprovider.NodeGroupDiscoveryOptions) (*clusterMana
 		}
 	}
 
-	clientapi, err := clientset.NewForConfig(kubeconfig)
+	kubeclient, err := kubeclient.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterapi, err := clientset.NewForConfig(kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create client for talking to the apiserver: %v", err)
 	}
 
 	return &clusterManager{
-		clientapi:       clientapi.ClusterV1alpha1(),
 		clusterSnapshot: newClusterSnapshot(),
+		clusterapi:      clusterapi.ClusterV1alpha1(),
+		kubeclient:      kubeclient,
 	}, nil
 }
 
-func (m *clusterManager) clusterRefresh(namespace string) (*clusterSnapshot, error) {
+func (m *clusterManager) clusterRefresh() (*clusterSnapshot, error) {
 	snapshot := newClusterSnapshot()
-	machineSets, err := m.clientapi.MachineSets(namespace).List(v1.ListOptions{})
+
+	namespaces, err := m.kubeclient.CoreV1().Namespaces().List(v1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to list machinesets in the %q namespace: %v", namespace, err)
+		return nil, nil
 	}
 
-	for i := range machineSets.Items {
-		ms := &clusterMachineSet{
-			clusterManager: m,
-			MachineSet:     &machineSets.Items[i],
-		}
-
-		msid := machineSetID(ms.MachineSet)
-		machines, err := m.clientapi.Machines(namespace).List(v1.ListOptions{
-			LabelSelector: labels.SelectorFromSet(ms.MachineSet.Spec.Selector.MatchLabels).String(),
-		})
-
+	for _, ns := range namespaces.Items {
+		machineSets, err := m.clusterapi.MachineSets(ns.Name).List(v1.ListOptions{})
 		if err != nil {
-			glog.Errorf("unable to get machines for %q: %v", msid)
-			continue
+			return nil, fmt.Errorf("unable to list machinesets in namespace %q: %v", ns, err)
 		}
 
-		snapshot.MachineSetMap[msid] = ms
-		snapshot.MachineSetNodeMap[msid] = []string{}
-
-		for _, machine := range machines.Items {
-			if machine.Status.NodeRef == nil {
-				glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
-				continue
-			}
-			if machine.Status.NodeRef.Kind != "Node" {
-				glog.Error("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
-				continue
+		for i := range machineSets.Items {
+			ms := &clusterMachineSet{
+				clusterManager: m,
+				MachineSet:     &machineSets.Items[i],
 			}
 
-			snapshot.NodeToMachineSetMap[machine.Status.NodeRef.Name] = msid
-			snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], machine.Status.NodeRef.Name)
+			msid := machineSetID(ms.MachineSet)
+			machines, err := m.clusterapi.Machines(ns.Name).List(v1.ListOptions{
+				LabelSelector: labels.SelectorFromSet(ms.MachineSet.Spec.Selector.MatchLabels).String(),
+			})
+
+			if err != nil {
+				glog.Errorf("unable to get machines for %q: %v", msid)
+				continue
+			}
+
+			snapshot.MachineSetMap[msid] = ms
+			snapshot.MachineSetNodeMap[msid] = []string{}
+
+			for _, machine := range machines.Items {
+				if machine.Status.NodeRef == nil {
+					glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
+					continue
+				}
+				if machine.Status.NodeRef.Kind != "Node" {
+					glog.Error("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
+					continue
+				}
+
+				snapshot.NodeToMachineSetMap[machine.Status.NodeRef.Name] = msid
+				snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], machine.Status.NodeRef.Name)
+			}
+
+			ms.nodes = snapshot.MachineSetNodeMap[msid]
+
+			glog.Infof("MachineSet: %q has nodes %v", msid, snapshot.MachineSetNodeMap[msid])
 		}
-
-		ms.nodes = snapshot.MachineSetNodeMap[msid]
-
-		glog.Infof("MachineSet: %q has nodes %v", msid, snapshot.MachineSetNodeMap[msid])
 	}
 
 	return snapshot, nil

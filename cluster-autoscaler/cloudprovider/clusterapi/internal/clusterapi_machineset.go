@@ -71,7 +71,7 @@ func (m *clusterMachineSet) Replicas() int {
 }
 
 func (m *clusterMachineSet) IncreaseSize(delta int) error {
-	ms, err := m.clientapi.MachineSets(m.MachineSet.Namespace).Get(m.MachineSet.Name, v1.GetOptions{})
+	ms, err := m.clusterapi.MachineSets(m.MachineSet.Namespace).Get(m.MachineSet.Name, v1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Unable to get machineset %q: %v", m.MachineSet.Name, err)
 	}
@@ -80,7 +80,7 @@ func (m *clusterMachineSet) IncreaseSize(delta int) error {
 	replicas := int32(delta)
 	newMachineSet.Spec.Replicas = &replicas
 
-	_, err = m.clientapi.MachineSets(m.MachineSet.Namespace).Update(newMachineSet)
+	_, err = m.clusterapi.MachineSets(m.MachineSet.Namespace).Update(newMachineSet)
 	if err != nil {
 		return fmt.Errorf("Unable to update number of replicas of machineset %q: %v", m.MachineSet.Name, err)
 	}
