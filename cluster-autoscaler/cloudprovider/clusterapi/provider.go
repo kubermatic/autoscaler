@@ -64,6 +64,9 @@ func (p *provider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, 
 	if err != nil {
 		return nil, err
 	}
+	if ms == nil {
+		return nil, nil
+	}
 	glog.Infof("provider.NodeGroupForNode(%q)=%s/%s", node.Name, ms.Namespace(), ms.Name())
 	return NewNodeGroup(p.clusterManager, ms), nil
 }
