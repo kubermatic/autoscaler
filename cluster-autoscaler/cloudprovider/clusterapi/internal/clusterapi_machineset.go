@@ -11,29 +11,17 @@ import (
 	v1alpha1apis "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
 
+const (
+	machineDeleteAnnotationKey = "sigs.k8s.io/cluster-api-delete-machine"
+)
+
 type clusterMachineSet struct {
 	*clusterManager
 	*v1alpha1apis.MachineSet
-	nodes []string
-}
-
-func getLabelAsInt(clusterMachineSet *v1alpha1apis.MachineSet, label string) (int, error) {
-	if _, exists := clusterMachineSet.Labels[label]; !exists {
-		return 0, fmt.Errorf("%q label not found", label)
-	}
-	u, err := strconv.ParseUint(clusterMachineSet.Labels[label], 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("cannot parse %q as an integral value: %v", clusterMachineSet.Labels[label], err)
-	}
-	return int(u), nil
-}
-
-func machineSetMinSize(clusterMachineSet *v1alpha1apis.MachineSet) (int, error) {
-	return getLabelAsInt(clusterMachineSet, "sigs.k8s.io/cluster-api-autoscaler-node-group-min-size")
-}
-
-func machineSetMaxSize(clusterMachineSet *v1alpha1apis.MachineSet) (int, error) {
-	return getLabelAsInt(clusterMachineSet, "sigs.k8s.io/cluster-api-autoscaler-node-group-max-size")
+	min     int
+	max     int
+	nodes   []string
+	nodeSet map[string]bool
 }
 
 func (m *clusterMachineSet) Name() string {
@@ -45,21 +33,11 @@ func (m *clusterMachineSet) Namespace() string {
 }
 
 func (m *clusterMachineSet) MinSize() int {
-	sz, err := machineSetMinSize(m.MachineSet)
-	if err != nil {
-		glog.Errorf("failed to get minimum size from %s/%s: %v", m.MachineSet.Namespace, m.MachineSet.Name, err)
-		return 0
-	}
-	return sz
+	return m.min
 }
 
 func (m *clusterMachineSet) MaxSize() int {
-	sz, err := machineSetMaxSize(m.MachineSet)
-	if err != nil {
-		glog.Errorf("failed to get maximum size from %s/%s: %v", m.MachineSet.Namespace, m.MachineSet.Name, err)
-		return 0
-	}
-	return sz
+	return m.max
 }
 
 func (m *clusterMachineSet) Replicas() int {
@@ -93,16 +71,54 @@ func (m *clusterMachineSet) Nodes() ([]string, error) {
 	return m.nodes, nil
 }
 
+func (m *clusterMachineSet) DeleteNodes(names []string) error {
+	// node := NodeFor
+	// ms, err := m.clusterapi.MachineSets(m.MachineSet.Namespace).Get(m.MachineSet.Name, v1.GetOptions{})
+	// if err != nil {
+	// 	return fmt.Errorf("Unable to get machineset %q: %v", m.MachineSet.Name, err)
+	// }
+
+	// newMachineSet := ms.DeepCopy()
+	// replicas := int32(delta)
+	// newMachineSet.Spec.Replicas = &replicas
+
+	return nil
+}
+
 func (m *clusterMachineSet) String() string {
 	return fmt.Sprintf("%s/%s", m.Namespace(), m.Name())
 }
 
-func (m *clusterMachineSet) hasBounds() bool {
-	if _, err := machineSetMinSize(m.MachineSet); err != nil {
-		return false
+func parseLabel(ms *v1alpha1apis.MachineSet, label string, result *int) {
+	val, exists := ms.Labels[label]
+	if !exists {
+		glog.Infof("machineset %s/%s has no label named %q", ms.Namespace, ms.Name, label)
+		return
 	}
-	if _, err := machineSetMaxSize(m.MachineSet); err != nil {
-		return false
+
+	u, err := strconv.ParseUint(val, 10, 32)
+	if err != nil {
+		glog.Errorf("machineset %s/%s: cannot parse %q as an integral value: %v", ms.Namespace, ms.Name, val, err)
+		return
 	}
-	return true
+
+	*result = int(u)
+}
+
+func newClusterMachineSet(m *clusterManager, ms *v1alpha1apis.MachineSet, nodes []string) *clusterMachineSet {
+	cms := clusterMachineSet{
+		clusterManager: m,
+		MachineSet:     ms,
+		nodes:          nodes,
+		nodeSet:        make(map[string]bool),
+	}
+
+	parseLabel(ms, "sigs.k8s.io/cluster-api-autoscaler-node-group-min-size", &cms.min)
+	parseLabel(ms, "sigs.k8s.io/cluster-api-autoscaler-node-group-max-size", &cms.max)
+
+	for i := range nodes {
+		cms.nodeSet[nodes[i]] = true
+	}
+
+	return &cms
 }

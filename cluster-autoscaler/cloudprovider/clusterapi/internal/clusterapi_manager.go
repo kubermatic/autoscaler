@@ -10,13 +10,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi/types"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	v1alpha1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 	"sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
 	v1alpha1apis "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
 )
@@ -24,14 +21,6 @@ import (
 const (
 	refreshInterval = 30 * time.Second
 )
-
-type MachineSetID string
-
-type clusterSnapshot struct {
-	MachineSetMap       map[MachineSetID]*clusterMachineSet
-	NodeToMachineSetMap map[string]MachineSetID
-	MachineSetNodeMap   map[MachineSetID][]string
-}
 
 type clusterManager struct {
 	lastRefresh          time.Time
@@ -64,7 +53,7 @@ func (m *clusterManager) GetMachineSets(namespace string) ([]types.MachineSet, e
 	result := []types.MachineSet{}
 
 	for _, ms := range m.getClusterState().MachineSetMap {
-		if ms.hasBounds() {
+		if ms.MaxSize()-ms.MinSize() > 0 {
 			result = append(result, ms)
 		}
 	}
@@ -99,16 +88,14 @@ func (m *clusterManager) Refresh() error {
 	if m.lastRefresh.Add(refreshInterval).After(time.Now()) && m.clusterSnapshot != nil {
 		return nil
 	}
-	return m.forceRefresh()
-}
 
-func (m *clusterManager) forceRefresh() error {
-	s, err := m.clusterRefresh()
+	s, err := getClusterSnaphot(m)
 	if err == nil {
 		m.lastRefresh = time.Now()
 		glog.Infof("cluster refreshed at %v\n%v", m.lastRefresh, spew.Sdump(s))
 		m.setClusterState(s)
 	}
+
 	return err
 }
 
@@ -133,76 +120,8 @@ func NewClusterManager(do cloudprovider.NodeGroupDiscoveryOptions) (*clusterMana
 	}
 
 	return &clusterManager{
-		clusterSnapshot: newClusterSnapshot(),
+		clusterSnapshot: newEmptySnapshot(),
 		clusterapi:      clusterapi.ClusterV1alpha1(),
 		kubeclient:      kubeclient,
 	}, nil
-}
-
-func (m *clusterManager) clusterRefresh() (*clusterSnapshot, error) {
-	snapshot := newClusterSnapshot()
-
-	namespaces, err := m.kubeclient.CoreV1().Namespaces().List(v1.ListOptions{})
-	if err != nil {
-		return nil, nil
-	}
-
-	for _, ns := range namespaces.Items {
-		machineSets, err := m.clusterapi.MachineSets(ns.Name).List(v1.ListOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("unable to list machinesets in namespace %q: %v", ns, err)
-		}
-
-		for i := range machineSets.Items {
-			ms := &clusterMachineSet{
-				clusterManager: m,
-				MachineSet:     &machineSets.Items[i],
-			}
-
-			msid := machineSetID(ms.MachineSet)
-			machines, err := m.clusterapi.Machines(ns.Name).List(v1.ListOptions{
-				LabelSelector: labels.SelectorFromSet(ms.MachineSet.Spec.Selector.MatchLabels).String(),
-			})
-
-			if err != nil {
-				glog.Errorf("unable to get machines for %q: %v", msid)
-				continue
-			}
-
-			snapshot.MachineSetMap[msid] = ms
-			snapshot.MachineSetNodeMap[msid] = []string{}
-
-			for _, machine := range machines.Items {
-				if machine.Status.NodeRef == nil {
-					glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
-					continue
-				}
-				if machine.Status.NodeRef.Kind != "Node" {
-					glog.Error("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
-					continue
-				}
-
-				snapshot.NodeToMachineSetMap[machine.Status.NodeRef.Name] = msid
-				snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], machine.Status.NodeRef.Name)
-			}
-
-			ms.nodes = snapshot.MachineSetNodeMap[msid]
-
-			glog.Infof("MachineSet: %q has nodes %v", msid, snapshot.MachineSetNodeMap[msid])
-		}
-	}
-
-	return snapshot, nil
-}
-
-func machineSetID(m *v1alpha1.MachineSet) MachineSetID {
-	return MachineSetID(fmt.Sprintf("%s/%s", m.Namespace, m.Name))
-}
-
-func newClusterSnapshot() *clusterSnapshot {
-	return &clusterSnapshot{
-		MachineSetMap:       make(map[MachineSetID]*clusterMachineSet),
-		MachineSetNodeMap:   make(map[MachineSetID][]string),
-		NodeToMachineSetMap: make(map[string]MachineSetID),
-	}
 }
