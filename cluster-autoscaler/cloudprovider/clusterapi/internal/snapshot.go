@@ -15,6 +15,7 @@ import (
 type MachineSetID string
 
 type clusterSnapshot struct {
+	NodeMap             map[MachineSetID]map[string]string
 	MachineSetMap       map[MachineSetID]*clusterMachineSet
 	NodeToMachineSetMap map[string]MachineSetID
 	MachineSetNodeMap   map[MachineSetID][]string
@@ -90,6 +91,8 @@ func mapMachinesForMachineSet(m *clusterManager, snapshot *clusterSnapshot, ms *
 
 	msid := machineSetID(ms)
 
+	snapshot.NodeMap[msid] = make(map[string]string)
+
 	for _, machine := range machines {
 		if machine.Status.NodeRef == nil {
 			glog.Errorf("Status.NodeRef of machine %q is nil", machine.Name)
@@ -99,6 +102,7 @@ func mapMachinesForMachineSet(m *clusterManager, snapshot *clusterSnapshot, ms *
 			glog.Error("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
 			continue
 		}
+		snapshot.NodeMap[msid][machine.Status.NodeRef.Name] = machine.Name
 		snapshot.NodeToMachineSetMap[machine.Status.NodeRef.Name] = msid
 		snapshot.MachineSetNodeMap[msid] = append(snapshot.MachineSetNodeMap[msid], machine.Status.NodeRef.Name)
 	}
@@ -143,6 +147,7 @@ func getClusterSnaphot(m *clusterManager) (*clusterSnapshot, error) {
 
 func newEmptySnapshot() *clusterSnapshot {
 	return &clusterSnapshot{
+		NodeMap:             make(map[MachineSetID]map[string]string),
 		MachineSetMap:       make(map[MachineSetID]*clusterMachineSet),
 		MachineSetNodeMap:   make(map[MachineSetID][]string),
 		NodeToMachineSetMap: make(map[string]MachineSetID),

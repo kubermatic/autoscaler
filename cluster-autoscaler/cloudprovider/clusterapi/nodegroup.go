@@ -53,14 +53,21 @@ func (ng *NodeGroup) IncreaseSize(delta int) error {
 	if size+delta > ng.MaxSize() {
 		return fmt.Errorf("size increase too large - desired:%d max:%d", size+delta, ng.MaxSize())
 	}
-	return ng.machineSet.IncreaseSize(size + delta)
+	return ng.machineSet.SetSize(size + delta)
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
 // failure or if the given node doesn't belong to this node group. This function
 // should wait until node group size is updated. Implementation required.
-func (ng *NodeGroup) DeleteNodes([]*apiv1.Node) error {
-	return ng.DecreaseTargetSize(-1)
+func (ng *NodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
+	names := make([]string, len(nodes))
+	for i := range nodes {
+		names[i] = nodes[i].Name
+	}
+	if err := ng.machineSet.DeleteNodes(names); err != nil {
+		return err
+	}
+	return ng.DecreaseTargetSize(-len(nodes))
 }
 
 // DecreaseTargetSize decreases the target size of the node group. This function
@@ -70,7 +77,7 @@ func (ng *NodeGroup) DeleteNodes([]*apiv1.Node) error {
 // is an option to just decrease the target. Implementation required.
 func (ng *NodeGroup) DecreaseTargetSize(delta int) error {
 	if delta >= 0 {
-		return fmt.Errorf("delta must be negative")
+		return fmt.Errorf("size decrease must be negative")
 	}
 
 	size, err := ng.TargetSize()
@@ -88,7 +95,7 @@ func (ng *NodeGroup) DecreaseTargetSize(delta int) error {
 			size, delta, len(nodes))
 	}
 
-	return ng.machineSet.IncreaseSize(size + delta)
+	return ng.machineSet.SetSize(size + delta)
 }
 
 // Id returns an unique identifier of the node group.

@@ -13,6 +13,7 @@ type MachineSet interface {
 	MinSize() int
 	MaxSize() int
 	Replicas() int
-	IncreaseSize(delta int) error
+	SetSize(n int) error
 	Nodes() ([]string, error)
+	DeleteNodes([]string) error
 }

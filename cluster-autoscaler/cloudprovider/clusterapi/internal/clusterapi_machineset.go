@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -48,14 +49,14 @@ func (m *clusterMachineSet) Replicas() int {
 	return int(*m.MachineSet.Spec.Replicas)
 }
 
-func (m *clusterMachineSet) IncreaseSize(delta int) error {
+func (m *clusterMachineSet) SetSize(nreplicas int) error {
 	ms, err := m.clusterapi.MachineSets(m.MachineSet.Namespace).Get(m.MachineSet.Name, v1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Unable to get machineset %q: %v", m.MachineSet.Name, err)
 	}
 
 	newMachineSet := ms.DeepCopy()
-	replicas := int32(delta)
+	replicas := int32(nreplicas)
 	newMachineSet.Spec.Replicas = &replicas
 
 	_, err = m.clusterapi.MachineSets(m.MachineSet.Namespace).Update(newMachineSet)
@@ -71,16 +72,33 @@ func (m *clusterMachineSet) Nodes() ([]string, error) {
 	return m.nodes, nil
 }
 
-func (m *clusterMachineSet) DeleteNodes(names []string) error {
-	// node := NodeFor
-	// ms, err := m.clusterapi.MachineSets(m.MachineSet.Namespace).Get(m.MachineSet.Name, v1.GetOptions{})
-	// if err != nil {
-	// 	return fmt.Errorf("Unable to get machineset %q: %v", m.MachineSet.Name, err)
-	// }
+func (m *clusterMachineSet) DeleteNodes(nodenames []string) error {
+	snapshot := m.getClusterState()
 
-	// newMachineSet := ms.DeepCopy()
-	// replicas := int32(delta)
-	// newMachineSet.Spec.Replicas = &replicas
+	for _, nodename := range nodenames {
+		name, exists := snapshot.NodeMap[machineSetID(m.MachineSet)][nodename]
+		if !exists {
+			return fmt.Errorf("cannot map nodename %q to machine: %v", nodename)
+		}
+		machine, err := m.clusterapi.Machines(m.MachineSet.Namespace).Get(name, v1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("cannot get machine %s/%s: %v", m.MachineSet.Namespace, name, err)
+		}
+
+		machine = machine.DeepCopy()
+
+		if machine.Annotations == nil {
+			machine.Annotations = map[string]string{}
+		}
+
+		// Annotate machine that it is the chosen one.
+		machine.Annotations["sigs.k8s.io/cluster-api-delete-machine"] = time.Now().String()
+
+		_, err = m.clusterapi.Machines(m.MachineSet.Namespace).Update(machine)
+		if err != nil {
+			return fmt.Errorf("unable to update machine %s: %v", *m, err)
+		}
+	}
 
 	return nil
 }
