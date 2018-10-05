@@ -67,7 +67,7 @@ func (ng *NodeGroup) DeleteNodes(nodes []*apiv1.Node) error {
 	if err := ng.machineSet.DeleteNodes(names); err != nil {
 		return err
 	}
-	return ng.DecreaseTargetSize(-len(nodes))
+	return nil
 }
 
 // DecreaseTargetSize decreases the target size of the node group. This function

@@ -45,7 +45,7 @@ func (m *clusterMachineSet) Replicas() int {
 	if m.MachineSet.Spec.Replicas == nil {
 		return 0
 	}
-	glog.Infof("MS: %q, Replicas=%d", m.MachineSet.Name, *m.MachineSet.Spec.Replicas)
+	glog.Infof("machineset: %q has %d replicas", m.MachineSet.Name, *m.MachineSet.Spec.Replicas)
 	return int(*m.MachineSet.Spec.Replicas)
 }
 
@@ -73,6 +73,10 @@ func (m *clusterMachineSet) Nodes() ([]string, error) {
 }
 
 func (m *clusterMachineSet) DeleteNodes(nodenames []string) error {
+	if len(nodenames) == 0 {
+		return nil
+	}
+
 	snapshot := m.getClusterState()
 
 	for _, nodename := range nodenames {
@@ -92,6 +96,7 @@ func (m *clusterMachineSet) DeleteNodes(nodenames []string) error {
 		}
 
 		// Annotate machine that it is the chosen one.
+		// TODO(frobware) - don't hardcode this name
 		machine.Annotations["sigs.k8s.io/cluster-api-delete-machine"] = time.Now().String()
 
 		_, err = m.clusterapi.Machines(m.MachineSet.Namespace).Update(machine)
@@ -100,7 +105,12 @@ func (m *clusterMachineSet) DeleteNodes(nodenames []string) error {
 		}
 	}
 
-	return nil
+	replicas := m.Replicas()
+	if replicas-len(nodenames) <= 0 {
+		return fmt.Errorf("unable to delete %d machines in %s, machine replicas are <= 0 ", len(nodenames), m)
+	}
+
+	return m.SetSize(replicas - len(nodenames))
 }
 
 func (m *clusterMachineSet) String() string {
