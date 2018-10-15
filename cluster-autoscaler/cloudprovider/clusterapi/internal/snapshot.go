@@ -1,5 +1,3 @@
-//go:generate ./vendor-cluster-api.sh
-
 package internal
 
 import (
