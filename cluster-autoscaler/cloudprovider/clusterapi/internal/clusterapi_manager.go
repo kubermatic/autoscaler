@@ -89,7 +89,7 @@ func (m *clusterManager) Refresh() error {
 		return nil
 	}
 
-	s, err := getClusterSnaphot(m)
+	s, err := getClusterSnapshot(m)
 	if err == nil {
 		m.lastRefresh = time.Now()
 		glog.Infof("cluster refreshed at %v\n%v", m.lastRefresh, spew.Sdump(s))

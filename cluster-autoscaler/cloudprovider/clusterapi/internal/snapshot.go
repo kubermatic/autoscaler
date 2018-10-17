@@ -125,7 +125,7 @@ func mapMachineSetsForNS(m *clusterManager, snapshot *clusterSnapshot, namespace
 	return nil
 }
 
-func getClusterSnaphot(m *clusterManager) (*clusterSnapshot, error) {
+func getClusterSnapshot(m *clusterManager) (*clusterSnapshot, error) {
 	snapshot := newEmptySnapshot()
 	namespaces, err := getNamespaces(m)
 	if err != nil {
