@@ -873,6 +873,9 @@ func getNotRegisteredNodes(allNodes []*apiv1.Node, cloudProvider cloudprovider.C
 		}
 		registered.Insert(node.Spec.ProviderID)
 	}
+	for _, node := range allNodes {
+		registered.Insert(node.Name)
+	}
 	notRegistered := make([]UnregisteredNode, 0)
 	for _, nodeGroup := range cloudProvider.NodeGroups() {
 		nodes, err := nodeGroup.Nodes()
