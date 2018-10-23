@@ -80,7 +80,7 @@ func (m *clusterMachineSet) DeleteNodes(nodenames []string) error {
 	for _, nodename := range nodenames {
 		name, exists := snapshot.NodeMap[machineSetID(m.MachineSet)][nodename]
 		if !exists {
-			return fmt.Errorf("cannot map nodename %q to machine: %v", nodename)
+			return fmt.Errorf("cannot map nodename %q to machine", nodename)
 		}
 		machine, err := m.clusterapi.Machines(m.MachineSet.Namespace).Get(name, v1.GetOptions{})
 		if err != nil {
@@ -99,7 +99,7 @@ func (m *clusterMachineSet) DeleteNodes(nodenames []string) error {
 
 		_, err = m.clusterapi.Machines(m.MachineSet.Namespace).Update(machine)
 		if err != nil {
-			return fmt.Errorf("unable to update machine %s: %v", *m, err)
+			return fmt.Errorf("unable to update machine %q: %v", machine.Name, err)
 		}
 	}
 
