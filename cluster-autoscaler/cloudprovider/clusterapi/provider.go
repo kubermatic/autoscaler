@@ -42,12 +42,10 @@ func (p *provider) Name() string {
 }
 
 func (p *provider) NodeGroups() []cloudprovider.NodeGroup {
-	glog.Info("provider.NodeGroups()")
-
 	machineSets, err := p.clusterManager.GetMachineSets("")
 	if err != nil {
-		glog.Fatalf("error fetching machinesets: %v", err)
-		return nil
+		glog.Errorf("error fetching machinesets: %v", err)
+		return []cloudprovider.NodeGroup{}
 	}
 
 	nodeGroups := make([]cloudprovider.NodeGroup, len(machineSets))
@@ -64,40 +62,35 @@ func (p *provider) NodeGroupForNode(node *apiv1.Node) (cloudprovider.NodeGroup, 
 	if err != nil {
 		return nil, err
 	}
+
 	if ms == nil {
 		return nil, nil
 	}
-	glog.Infof("provider.NodeGroupForNode(%q)=%s/%s", node.Name, ms.Namespace(), ms.Name())
+
 	return NewNodeGroup(p.clusterManager, ms), nil
 }
 
 func (p *provider) Pricing() (cloudprovider.PricingModel, errors.AutoscalerError) {
-	glog.Info("provider.Pricing()")
 	return nil, cloudprovider.ErrNotImplemented
 }
 
 func (p *provider) GetAvailableMachineTypes() ([]string, error) {
-	glog.Info("provider.GetAvailableMachineTypes()")
 	return []string{}, nil
 }
 
 func (p *provider) NewNodeGroup(machineType string, labels map[string]string, systemLabels map[string]string, taints []apiv1.Taint, extraResources map[string]resource.Quantity) (cloudprovider.NodeGroup, error) {
-	glog.Info("provider.NewNodeGroup()")
 	return nil, cloudprovider.ErrNotImplemented
 }
 
 func (p *provider) GetResourceLimiter() (*cloudprovider.ResourceLimiter, error) {
-	glog.Info("provider.GetResourceLimiter()")
 	return p.resourceLimiter, nil
 }
 
 func (p *provider) Cleanup() error {
-	glog.Info("provider.Cleanup()")
 	return p.clusterManager.Cleanup()
 }
 
 func (p *provider) Refresh() error {
-	glog.Info("provider.Refresh()")
 	return p.clusterManager.Refresh()
 }
 

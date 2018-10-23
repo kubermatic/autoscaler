@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi/types"
 	kubeclient "k8s.io/client-go/kubernetes"
@@ -31,16 +29,6 @@ type clusterManager struct {
 	resourceLimits       *cloudprovider.ResourceLimiter
 }
 
-func init() {
-	spew.Config = spew.ConfigState{
-		DisablePointerAddresses: true,
-		DisableCapacities:       true,
-		SortKeys:                true,
-		SpewKeys:                true,
-		Indent:                  "  ",
-	}
-}
-
 func (m *clusterManager) Cleanup() error {
 	return nil
 }
@@ -58,15 +46,12 @@ func (m *clusterManager) GetMachineSets(namespace string) ([]types.MachineSet, e
 		}
 	}
 
-	glog.Infof("NODE GROUPS %v", spew.Sdump(result))
-
 	return result, nil
 }
 
 func (m *clusterManager) MachineSetForNode(nodename string) (types.MachineSet, error) {
 	snapshot := m.getClusterState()
 	if key, exists := snapshot.NodeToMachineSetMap[nodename]; exists {
-		glog.Infof("MachineSetForNode[%q]=%q", nodename, key)
 		return snapshot.MachineSetMap[key], nil
 	}
 	return nil, nil
@@ -92,7 +77,6 @@ func (m *clusterManager) Refresh() error {
 	s, err := getClusterSnapshot(m)
 	if err == nil {
 		m.lastRefresh = time.Now()
-		glog.Infof("cluster refreshed at %v\n%v", m.lastRefresh, spew.Sdump(s))
 		m.setClusterState(s)
 	}
 

@@ -59,8 +59,6 @@ func getMachineSetsInNamespace(m *clusterManager, namespace string) ([]*v1alpha1
 		result[i] = &machineSets.Items[i]
 	}
 
-	glog.Infof("%d machinesets in namespace %q: %#v", len(result), namespace, names)
-
 	return result, nil
 }
 
@@ -75,8 +73,6 @@ func getNamespaces(m *clusterManager) ([]string, error) {
 	for i := range namespaces.Items {
 		result[i] = namespaces.Items[i].Name
 	}
-
-	glog.Infof("%d namespaces: %#v", len(result), result)
 
 	return result, nil
 }
@@ -137,8 +133,6 @@ func getClusterSnapshot(m *clusterManager) (*clusterSnapshot, error) {
 			return nil, err
 		}
 	}
-
-	glog.Infof("cluster snapshot: %+v", snapshot)
 
 	return snapshot, err
 }
