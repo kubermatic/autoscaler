@@ -17,40 +17,58 @@ limitations under the License.
 package v1alpha1
 
 import (
-	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilpointer "k8s.io/utils/pointer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/cluster-api/pkg/apis/cluster/common"
 )
 
-const (
-	// DefaultQPS is the default QPS value
-	DefaultQPS = int64(10)
-	// DefaultBurst is the default burst value
-	DefaultBurst = int64(15)
-)
-
-// DefaultThrottle is a default throttle config
-func DefaultThrottle() *auditregistrationv1alpha1.WebhookThrottleConfig {
-	return &auditregistrationv1alpha1.WebhookThrottleConfig{
-		QPS:   utilpointer.Int64Ptr(DefaultQPS),
-		Burst: utilpointer.Int64Ptr(DefaultBurst),
+// PopulateDefaultsMachineDeployment fills in default field values
+// Currently it is called after reading objects, but it could be called in an admission webhook also
+func PopulateDefaultsMachineDeployment(d *MachineDeployment) {
+	if d.Spec.Replicas == nil {
+		d.Spec.Replicas = new(int32)
+		*d.Spec.Replicas = 1
 	}
-}
 
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return RegisterDefaults(scheme)
-}
+	if d.Spec.MinReadySeconds == nil {
+		d.Spec.MinReadySeconds = new(int32)
+		*d.Spec.MinReadySeconds = 0
+	}
 
-// SetDefaults_AuditSink sets defaults if the audit sink isn't present
-func SetDefaults_AuditSink(obj *auditregistrationv1alpha1.AuditSink) {
-	if obj.Spec.Webhook.Throttle != nil {
-		if obj.Spec.Webhook.Throttle.QPS == nil {
-			obj.Spec.Webhook.Throttle.QPS = utilpointer.Int64Ptr(DefaultQPS)
+	if d.Spec.RevisionHistoryLimit == nil {
+		d.Spec.RevisionHistoryLimit = new(int32)
+		*d.Spec.RevisionHistoryLimit = 1
+	}
+
+	if d.Spec.ProgressDeadlineSeconds == nil {
+		d.Spec.ProgressDeadlineSeconds = new(int32)
+		*d.Spec.ProgressDeadlineSeconds = 600
+	}
+
+	if d.Spec.Strategy == nil {
+		d.Spec.Strategy = &MachineDeploymentStrategy{}
+	}
+
+	if d.Spec.Strategy.Type == "" {
+		d.Spec.Strategy.Type = common.RollingUpdateMachineDeploymentStrategyType
+	}
+
+	// Default RollingUpdate strategy only if strategy type is RollingUpdate.
+	if d.Spec.Strategy.Type == common.RollingUpdateMachineDeploymentStrategyType {
+		if d.Spec.Strategy.RollingUpdate == nil {
+			d.Spec.Strategy.RollingUpdate = &MachineRollingUpdateDeployment{}
 		}
-		if obj.Spec.Webhook.Throttle.Burst == nil {
-			obj.Spec.Webhook.Throttle.Burst = utilpointer.Int64Ptr(DefaultBurst)
+		if d.Spec.Strategy.RollingUpdate.MaxSurge == nil {
+			ios1 := intstr.FromInt(1)
+			d.Spec.Strategy.RollingUpdate.MaxSurge = &ios1
 		}
-	} else {
-		obj.Spec.Webhook.Throttle = DefaultThrottle()
+		if d.Spec.Strategy.RollingUpdate.MaxUnavailable == nil {
+			ios0 := intstr.FromInt(0)
+			d.Spec.Strategy.RollingUpdate.MaxUnavailable = &ios0
+		}
+	}
+
+	if len(d.Namespace) == 0 {
+		d.Namespace = metav1.NamespaceDefault
 	}
 }
