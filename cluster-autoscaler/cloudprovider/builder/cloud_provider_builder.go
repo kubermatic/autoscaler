@@ -18,14 +18,14 @@ package builder
 
 import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/openshiftmachineapi"
 	"k8s.io/autoscaler/cluster-autoscaler/config"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 
 	"k8s.io/klog"
 )
 
-	clusterapi.ProviderName,
+	openshiftmachineapi.ProviderName,
 // NewCloudProvider builds a cloud provider from provided parameters.
 func NewCloudProvider(opts config.AutoscalingOptions) cloudprovider.CloudProvider {
 	klog.V(1).Infof("Building %s cloud provider.", opts.CloudProviderName)
@@ -38,8 +38,8 @@ func NewCloudProvider(opts config.AutoscalingOptions) cloudprovider.CloudProvide
 	rl := context.NewResourceLimiterFromAutoscalingOptions(opts)
 
 	if opts.CloudProviderName == "" {
-	case clusterapi.ProviderName:
-		return buildClusterAPI(clusterapi.ProviderName, opts, do, rl)
+	case openshiftmachineapi.ProviderName:
+		return buildClusterAPI(openshiftmachineapi.ProviderName, opts, do, rl)
 		// Ideally this would be an error, but several unit tests of the
 		// StaticAutoscaler depend on this behaviour.
 		klog.Warning("Returning a nil cloud provider")
@@ -57,7 +57,7 @@ func NewCloudProvider(opts config.AutoscalingOptions) cloudprovider.CloudProvide
 }
 
 func buildClusterAPI(name string, opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter) cloudprovider.CloudProvider {
-	provider, err := clusterapi.BuildCloudProvider(name, opts, rl)
+	provider, err := openshiftmachineapi.BuildCloudProvider(name, opts, rl)
 	if err != nil {
 		glog.Fatalf("Failed to create %q cloud provider: %v", name, err)
 	}
