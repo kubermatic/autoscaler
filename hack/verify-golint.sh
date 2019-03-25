@@ -1,34 +1,39 @@
 #!/bin/bash
-source "$(dirname "${BASH_SOURCE}")/lib/init.sh"
 
-os::golang::verify_go_version
-os::util::ensure::system_binary_exists 'golint'
+# Copyright 2014 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-arg="${1:-""}"
-bad_files=""
+set -o errexit
+set -o nounset
+set -o pipefail
 
-if [ "$arg" == "-m" ]; then
-	head=$(git rev-parse --short HEAD | xargs echo -n)
-	set +e
-	modified_files=$(git diff-tree --no-commit-id --name-only -r master..$head | \
-		grep "^pkg" | grep ".go$" | grep -v "bindata.go$" | grep -v "Godeps" | \
-		grep -v "third_party")
-	if [ -n "${modified_files}" ]; then
-		echo -e "Checking modified files: ${modified_files}\n"
-		for f in $modified_files; do golint $f; done
-		echo
-	fi
-	set -e
-else
-	bad_files=$(os::util::list_go_src_files | \
-		sort -u | \
-		sed 's/^.{2}//' | \
-		xargs -n1 printf "${GOPATH}/src/${OS_GO_PACKAGE}/%s\n" | \
-		xargs -n1 golint)
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+cd "${KUBE_ROOT}"
+
+GOLINT=${GOLINT:-"golint"}
+PACKAGES=($(go list ./... | grep -v /vendor/ | grep -v vertical-pod-autoscaler/pkg/client | grep -v vertical-pod-autoscaler/pkg/apis))
+bad_files=()
+for package in "${PACKAGES[@]}"; do
+  out=$("${GOLINT}" -min_confidence=0.9 "${package}")
+  if [[ -n "${out}" ]]; then
+    bad_files+=("${out}")
+  fi
+done
+if [[ "${#bad_files[@]}" -ne 0 ]]; then
+  echo "!!! '$GOLINT' problems: "
+  echo "${bad_files[@]}"
+  exit 1
 fi
 
-if [[ -n "${bad_files}" ]]; then
-	echo "golint detected following problems:"
-	echo "${bad_files}"
-	exit 1
-fi
+# ex: ts=2 sw=2 et filetype=sh
