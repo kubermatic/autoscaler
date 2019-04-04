@@ -149,6 +149,8 @@ var (
 
 	expendablePodsPriorityCutoff = flag.Int("expendable-pods-priority-cutoff", 0, "Pods with priority below cutoff will be expendable. They can be killed without any consideration during scale down and they don't cause scale up. Pods with null priority (PodPriority disabled) are non expendable.")
 	regional                     = flag.Bool("regional", false, "Cluster is regional.")
+	// Path to kube configuration if available
+	KubeConfigPath string
 )
 
 func createAutoscalingOptions() context.AutoscalingOptions {
@@ -205,6 +207,7 @@ func createAutoscalingOptions() context.AutoscalingOptions {
 		MaxAutoprovisionedNodeGroupCount: *maxAutoprovisionedNodeGroupCount,
 		ExpendablePodsPriorityCutoff:     *expendablePodsPriorityCutoff,
 		Regional:                         *regional,
+		KubeConfigPath:                   *kubeConfigFile,
 	}
 }
 
