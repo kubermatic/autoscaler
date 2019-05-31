@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-	fakeclusterapi "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/fake"
+	fakeclusterapi "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned/fake"
 )
 
 type testControllerShutdownFunc func()

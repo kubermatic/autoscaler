@@ -24,7 +24,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-	clusterv1alpha1 "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
+	clusterv1alpha1 "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned/typed/cluster/v1alpha1"
 )
 
 const (

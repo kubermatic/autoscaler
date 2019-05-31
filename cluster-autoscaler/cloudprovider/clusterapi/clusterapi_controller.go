@@ -27,9 +27,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-	clusterclient "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
-	clusterinformers "sigs.k8s.io/cluster-api/pkg/client/informers_generated/externalversions"
-	clusterv1alpha1 "sigs.k8s.io/cluster-api/pkg/client/informers_generated/externalversions/cluster/v1alpha1"
+	clusterclient "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned"
+	clusterinformers "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions"
+	clusterv1alpha1 "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions/cluster/v1alpha1"
 )
 
 const (

@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-	clusterclientset "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
+	clusterclientset "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned"
 )
 
 const (
