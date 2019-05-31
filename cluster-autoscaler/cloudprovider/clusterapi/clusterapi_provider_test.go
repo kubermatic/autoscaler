@@ -96,11 +96,4 @@ func TestProviderConstructorProperties(t *testing.T) {
 		t.Fatalf("unexpected nodegroup: %v", ng.Id())
 	}
 
-	if got := provider.GPULabel(); got != GPULabel {
-		t.Fatalf("expected %q, got %q", GPULabel, got)
-	}
-
-	if got := len(provider.GetAvailableGPUTypes()); got != 0 {
-		t.Fatalf("expected 0 GPU types, got %d", got)
-	}
 }
