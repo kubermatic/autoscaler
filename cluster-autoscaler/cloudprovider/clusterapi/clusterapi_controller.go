@@ -22,14 +22,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	clusterclient "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned"
+	clusterinformers "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions"
+	clusterv1alpha1 "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions/cluster/v1alpha1"
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-	clusterclient "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned"
-	clusterinformers "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions"
-	clusterv1alpha1 "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions/cluster/v1alpha1"
 )
 
 const (
