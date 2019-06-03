@@ -23,6 +23,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/aws"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/azure"
+	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kubemark"
 	"k8s.io/client-go/informers"
@@ -36,15 +37,11 @@ import (
 
 // AvailableCloudProviders supported by the cloud provider builder.
 var AvailableCloudProviders = []string{
-	aws.ProviderName,
-	azure.ProviderName,
-	gce.ProviderNameGCE,
-	gce.ProviderNameGKE,
-	kubemark.ProviderName,
+	clusterapi.ProviderName,
 }
 
-// DefaultCloudProvider is GCE.
-const DefaultCloudProvider = gce.ProviderNameGCE
+// DefaultCloudProvider for machineapi-only build.
+const DefaultCloudProvider = clusterapi.ProviderName
 
 // CloudProviderBuilder builds a cloud provider from all the necessary parameters including the name of a cloud provider e.g. aws, gce
 // and the path to a config file
@@ -54,16 +51,18 @@ type CloudProviderBuilder struct {
 	clusterName             string
 	autoprovisioningEnabled bool
 	regional                bool
+	kubeconfigPath          string
 }
 
 // NewCloudProviderBuilder builds a new builder from static settings
-func NewCloudProviderBuilder(cloudProviderFlag, cloudConfig, clusterName string, autoprovisioningEnabled, regional bool) CloudProviderBuilder {
+func NewCloudProviderBuilder(kubeconfigPath, cloudProviderFlag, cloudConfig, clusterName string, autoprovisioningEnabled, regional bool) CloudProviderBuilder {
 	return CloudProviderBuilder{
 		cloudProviderFlag:       cloudProviderFlag,
 		cloudConfig:             cloudConfig,
 		clusterName:             clusterName,
 		autoprovisioningEnabled: autoprovisioningEnabled,
 		regional:                regional,
+		kubeconfigPath:          kubeconfigPath,
 	}
 }
 
@@ -87,6 +86,8 @@ func (b CloudProviderBuilder) Build(discoveryOpts cloudprovider.NodeGroupDiscove
 		return b.buildAzure(discoveryOpts, resourceLimiter)
 	case kubemark.ProviderName:
 		return b.buildKubemark(discoveryOpts, resourceLimiter)
+	case clusterapi.ProviderName:
+		return clusterapi.BuildClusterAPI(b.kubeconfigPath, discoveryOpts, resourceLimiter)
 	case "":
 		// Ideally this would be an error, but several unit tests of the
 		// StaticAutoscaler depend on this behaviour.

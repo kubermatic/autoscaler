@@ -175,7 +175,7 @@ func TestNodeGroupNewNodeGroupConstructor(t *testing.T) {
 			t.Errorf("expected %t, got %t", true, exists)
 		}
 
-		if _, err := ng.Create(); err != cloudprovider.ErrAlreadyExist {
+		if err := ng.Create(); err != cloudprovider.ErrAlreadyExist {
 			t.Error("expected error")
 		}
 
@@ -623,12 +623,12 @@ func TestNodeGroupDeleteNodes(t *testing.T) {
 		}
 
 		sort.SliceStable(nodeNames, func(i, j int) bool {
-			return nodeNames[i].Id < nodeNames[j].Id
+			return nodeNames[i] < nodeNames[j]
 		})
 
 		for i := 0; i < len(nodeNames); i++ {
-			if nodeNames[i].Id != testConfig.nodes[i].Spec.ProviderID {
-				t.Fatalf("expected %q, got %q", testConfig.nodes[i].Spec.ProviderID, nodeNames[i].Id)
+			if nodeNames[i] != testConfig.nodes[i].Spec.ProviderID {
+				t.Fatalf("expected %q, got %q", testConfig.nodes[i].Spec.ProviderID, nodeNames[i])
 			}
 		}
 

@@ -19,16 +19,15 @@ package clusterapi
 import (
 	"reflect"
 
+	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	clusterclientset "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
-	"k8s.io/autoscaler/cluster-autoscaler/config"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
-	clusterclientset "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -132,11 +131,11 @@ func newProvider(
 }
 
 // BuildClusterAPI builds CloudProvider implementation for machine api.
-func BuildClusterAPI(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter) cloudprovider.CloudProvider {
+func BuildClusterAPI(kubeconfigPath string, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter) cloudprovider.CloudProvider {
 	var err error
 	var config *rest.Config
 
-	config, err = clientcmd.BuildConfigFromFlags("", opts.KubeConfigPath)
+	config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
 		klog.Fatalf("cannot build config: %v", err)
 	}

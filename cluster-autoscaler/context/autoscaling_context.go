@@ -143,7 +143,8 @@ type AutoscalingOptions struct {
 	// Pods with null priority (PodPriority disabled) are non-expendable.
 	ExpendablePodsPriorityCutoff int
 	// Regional tells whether the cluster is regional.
-	Regional bool
+	Regional       bool
+	KubeConfigPath string
 }
 
 // NewResourceLimiterFromAutoscalingOptions creates new instance of cloudprovider.ResourceLimiter
@@ -170,7 +171,7 @@ func NewAutoscalingContext(options AutoscalingOptions, predicateChecker *simulat
 	kubeClient kube_client.Interface, kubeEventRecorder kube_record.EventRecorder,
 	logEventRecorder *utils.LogEventRecorder, listerRegistry kube_util.ListerRegistry) (*AutoscalingContext, errors.AutoscalerError) {
 
-	cloudProviderBuilder := builder.NewCloudProviderBuilder(options.CloudProviderName, options.CloudConfig, options.ClusterName, options.NodeAutoprovisioningEnabled, options.Regional)
+	cloudProviderBuilder := builder.NewCloudProviderBuilder(options.KubeConfigPath, options.CloudProviderName, options.CloudConfig, options.ClusterName, options.NodeAutoprovisioningEnabled, options.Regional)
 	cloudProvider := cloudProviderBuilder.Build(cloudprovider.NodeGroupDiscoveryOptions{
 		NodeGroupSpecs:              options.NodeGroups,
 		NodeGroupAutoDiscoverySpecs: options.NodeGroupAutoDiscovery},

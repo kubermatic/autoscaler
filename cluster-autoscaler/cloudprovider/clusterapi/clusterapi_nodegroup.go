@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 	clusterv1alpha1 "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
 )
@@ -168,20 +168,12 @@ func (ng *nodegroup) Debug() string {
 }
 
 // Nodes returns a list of all nodes that belong to this node group.
-func (ng *nodegroup) Nodes() ([]cloudprovider.Instance, error) {
+func (ng *nodegroup) Nodes() ([]string, error) {
 	nodes, err := ng.scalableResource.Nodes()
 	if err != nil {
 		return nil, err
 	}
-
-	instances := make([]cloudprovider.Instance, len(nodes))
-	for i := range nodes {
-		instances[i] = cloudprovider.Instance{
-			Id: nodes[i],
-		}
-	}
-
-	return instances, nil
+	return nodes, nil
 }
 
 // TemplateNodeInfo returns a schedulercache.NodeInfo structure of an
@@ -192,7 +184,7 @@ func (ng *nodegroup) Nodes() ([]cloudprovider.Instance, error) {
 // allocatable information as well as all pods that are started on the
 // node by default, using manifest (most likely only kube-proxy).
 // Implementation optional.
-func (ng *nodegroup) TemplateNodeInfo() (*schedulernodeinfo.NodeInfo, error) {
+func (ng *nodegroup) TemplateNodeInfo() (*schedulercache.NodeInfo, error) {
 	return nil, cloudprovider.ErrNotImplemented
 }
 
@@ -205,8 +197,8 @@ func (ng *nodegroup) Exist() bool {
 
 // Create creates the node group on the cloud nodegroup side.
 // Implementation optional.
-func (ng *nodegroup) Create() (cloudprovider.NodeGroup, error) {
-	return nil, cloudprovider.ErrAlreadyExist
+func (ng *nodegroup) Create() error {
+	return cloudprovider.ErrAlreadyExist
 }
 
 // Delete deletes the node group on the cloud nodegroup side. This will
