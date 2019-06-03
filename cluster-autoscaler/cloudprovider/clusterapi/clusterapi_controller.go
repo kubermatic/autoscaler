@@ -25,11 +25,11 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"github.com/golang/glog"
 	"sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-	clusterclient "sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset"
-	clusterinformers "sigs.k8s.io/cluster-api/pkg/client/informers_generated/externalversions"
-	clusterv1alpha1 "sigs.k8s.io/cluster-api/pkg/client/informers_generated/externalversions/cluster/v1alpha1"
+	clusterclient "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/clientset/versioned"
+	clusterinformers "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions"
+	clusterv1alpha1 "k8s.io/autoscaler/cluster-autoscaler/client/clusterapi/informers/externalversions/cluster/v1alpha1"
 )
 
 const (
@@ -131,7 +131,7 @@ func (c *machineController) run(stopCh <-chan struct{}) error {
 	c.kubeInformerFactory.Start(stopCh)
 	c.clusterInformerFactory.Start(stopCh)
 
-	klog.V(4).Infof("waiting for caches to sync")
+	glog.V(4).Infof("waiting for caches to sync")
 	if !cache.WaitForCacheSync(stopCh,
 		c.nodeInformer.HasSynced,
 		c.machineInformer.Informer().HasSynced,
@@ -264,11 +264,11 @@ func (c *machineController) machineSetNodeNames(machineSet *v1alpha1.MachineSet)
 
 	for _, machine := range machines {
 		if machine.Status.NodeRef == nil {
-			klog.V(4).Infof("Status.NodeRef of machine %q is currently nil", machine.Name)
+			glog.V(4).Infof("Status.NodeRef of machine %q is currently nil", machine.Name)
 			continue
 		}
 		if machine.Status.NodeRef.Kind != "Node" {
-			klog.Errorf("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
+			glog.Errorf("Status.NodeRef of machine %q does not reference a node (rather %q)", machine.Name, machine.Status.NodeRef.Kind)
 			continue
 		}
 
@@ -282,7 +282,7 @@ func (c *machineController) machineSetNodeNames(machineSet *v1alpha1.MachineSet)
 		}
 	}
 
-	klog.V(4).Infof("nodegroup %s has nodes %v", machineSet.Name, nodes)
+	glog.V(4).Infof("nodegroup %s has nodes %v", machineSet.Name, nodes)
 
 	return nodes, nil
 }
@@ -412,6 +412,6 @@ func (c *machineController) nodeGroupForNode(node *corev1.Node) (*nodegroup, err
 		return nil, nil
 	}
 
-	klog.V(4).Infof("node %q is in nodegroup %q", node.Name, machineSet.Name)
+	glog.V(4).Infof("node %q is in nodegroup %q", node.Name, machineSet.Name)
 	return nodegroup, nil
 }

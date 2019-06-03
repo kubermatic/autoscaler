@@ -66,11 +66,11 @@ func (p *provider) NodeGroups() []cloudprovider.NodeGroup {
 	var result []cloudprovider.NodeGroup
 	nodegroups, err := p.controller.nodeGroups()
 	if err != nil {
-		klog.Errorf("error getting node groups: %v", err)
+		glog.Errorf("error getting node groups: %v", err)
 		return nil
 	}
 	for _, ng := range nodegroups {
-		klog.V(4).Infof("discovered node group: %s", ng.Debug())
+		glog.V(4).Infof("discovered node group: %s", ng.Debug())
 		result = append(result, ng)
 	}
 	return result
@@ -137,23 +137,23 @@ func BuildClusterAPI(kubeconfigPath string, do cloudprovider.NodeGroupDiscoveryO
 
 	config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
-		klog.Fatalf("cannot build config: %v", err)
+		glog.Fatalf("cannot build config: %v", err)
 	}
 
 	kubeclient, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		klog.Fatalf("create kube clientset failed: %v", err)
+		glog.Fatalf("create kube clientset failed: %v", err)
 	}
 
 	clusterclient, err := clusterclientset.NewForConfig(config)
 	if err != nil {
-		klog.Fatalf("create cluster clientset failed: %v", err)
+		glog.Fatalf("create cluster clientset failed: %v", err)
 	}
 
 	controller, err := newMachineController(kubeclient, clusterclient)
 
 	if err != nil {
-		klog.Fatal(err)
+		glog.Fatal(err)
 	}
 
 	// Ideally this would be passed in but the builder is not
@@ -161,12 +161,12 @@ func BuildClusterAPI(kubeconfigPath string, do cloudprovider.NodeGroupDiscoveryO
 	stopCh := make(chan struct{})
 
 	if err := controller.run(stopCh); err != nil {
-		klog.Fatal(err)
+		glog.Fatal(err)
 	}
 
 	provider, err := newProvider(ProviderName, rl, controller)
 	if err != nil {
-		klog.Fatal(err)
+		glog.Fatal(err)
 	}
 
 	return provider
